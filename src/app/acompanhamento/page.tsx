@@ -17,22 +17,30 @@ export default function AcompanhamentoPage() {
     setError('')
 
     try {
+      console.log('Enviando requisição com token:', token)
+      
       const response = await fetch('/api/processes/track', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ 
+          token: token.trim().toUpperCase(), 
+          password: password.trim()
+        }),
       })
 
+      const data = await response.json()
+      
       if (!response.ok) {
-        const data = await response.text()
-        throw new Error(data || 'Erro ao verificar processo')
+        console.error('Erro na resposta:', data)
+        throw new Error(data.error || data.message || 'Erro ao verificar processo')
       }
 
-      const data = await response.json()
+      console.log('Processo encontrado:', data.id)
       router.push(`/acompanhamento/${data.id}`)
     } catch (error) {
+      console.error('Erro ao verificar processo:', error)
       setError(error instanceof Error ? error.message : 'Erro ao verificar processo')
     } finally {
       setLoading(false)
@@ -78,6 +86,7 @@ export default function AcompanhamentoPage() {
                   required
                   value={token}
                   onChange={(e) => setToken(e.target.value.toUpperCase())}
+                  placeholder="Ex: ABC123"
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 />
               </div>
@@ -94,7 +103,8 @@ export default function AcompanhamentoPage() {
                   type="password"
                   required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value.toUpperCase())}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••"
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 />
               </div>

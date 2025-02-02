@@ -43,7 +43,9 @@ export async function POST(request: Request) {
     // Gerar credenciais
     const loginToken = crypto.randomBytes(4).toString('hex')
     const password = crypto.randomBytes(4).toString('hex')
+    console.log('[PROCESS_CREATE] Senha gerada:', password)
     const hashedPassword = await hash(password, 12)
+    console.log('[PROCESS_CREATE] Hash gerado:', hashedPassword)
 
     // Criar processo
     const processResult = await query(
@@ -56,9 +58,10 @@ export async function POST(request: Request) {
         login_token,
         password,
         user_id,
+        status,
         created_at,
         updated_at
-      ) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING id`,
       [
         title,
@@ -67,7 +70,8 @@ export async function POST(request: Request) {
         priority || 'MEDIUM',
         loginToken,
         hashedPassword,
-        user.id
+        user.id,
+        'CADASTRO_REALIZADO'
       ]
     )
 

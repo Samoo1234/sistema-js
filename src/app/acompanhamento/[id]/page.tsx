@@ -14,12 +14,9 @@ interface Process {
   id: string
   title: string
   status: string
-  client: {
-    name: string
-    document: string
-    email: string
-    phone: string
-  }
+  clientName: string
+  clientEmail: string
+  client_id: number
   history: ProcessHistory[]
 }
 
@@ -27,27 +24,21 @@ const statusColors = {
   CADASTRO_REALIZADO: 'bg-blue-500',
   EM_ANALISE_DOCUMENTOS: 'bg-yellow-500',
   DOCUMENTOS_APROVADOS: 'bg-green-500',
-  DOCUMENTOS_REPROVADOS: 'bg-red-500',
-  DECISAO_FINAL_APROVADA: 'bg-green-500',
-  DECISAO_FINAL_REPROVADA: 'bg-red-500'
+  DOCUMENTOS_REPROVADOS: 'bg-red-500'
 }
 
 const statusIcons = {
   CADASTRO_REALIZADO: Clock,
   EM_ANALISE_DOCUMENTOS: Clock,
   DOCUMENTOS_APROVADOS: CheckCircle2,
-  DOCUMENTOS_REPROVADOS: XCircle,
-  DECISAO_FINAL_APROVADA: CheckCircle2,
-  DECISAO_FINAL_REPROVADA: XCircle
+  DOCUMENTOS_REPROVADOS: XCircle
 }
 
 const statusMessages = {
   CADASTRO_REALIZADO: 'Cadastro Realizado',
   EM_ANALISE_DOCUMENTOS: 'Em Análise de Documentos',
   DOCUMENTOS_APROVADOS: 'Documentos Aprovados',
-  DOCUMENTOS_REPROVADOS: 'Documentos Reprovados',
-  DECISAO_FINAL_APROVADA: 'Decisão Final Aprovada',
-  DECISAO_FINAL_REPROVADA: 'Decisão Final Reprovada'
+  DOCUMENTOS_REPROVADOS: 'Documentos Reprovados'
 }
 
 export default function ProcessoDetalhesPage({ params }: { params: { id: string } }) {
@@ -65,6 +56,7 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
         }
 
         const data = await response.json()
+        console.log('[DEBUG] Dados do processo:', data)
         setProcess(data)
       } catch (error) {
         console.error('[LOAD_PROCESS_ERROR]', error)
@@ -127,21 +119,23 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
             <dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
               <div className="sm:col-span-1">
                 <dt className="text-sm font-medium text-gray-500">Nome</dt>
-                <dd className="mt-1 text-sm text-gray-900">{process.client.name}</dd>
-              </div>
-              <div className="sm:col-span-1">
-                <dt className="text-sm font-medium text-gray-500">Documento</dt>
-                <dd className="mt-1 text-sm text-gray-900">{process.client.document}</dd>
+                <dd className="mt-1 text-sm text-gray-900">{process.clientName}</dd>
               </div>
               <div className="sm:col-span-1">
                 <dt className="text-sm font-medium text-gray-500">Email</dt>
-                <dd className="mt-1 text-sm text-gray-900">{process.client.email}</dd>
-              </div>
-              <div className="sm:col-span-1">
-                <dt className="text-sm font-medium text-gray-500">Telefone</dt>
-                <dd className="mt-1 text-sm text-gray-900">{process.client.phone}</dd>
+                <dd className="mt-1 text-sm text-gray-900">{process.clientEmail}</dd>
               </div>
             </dl>
+          </div>
+
+          {/* Status Atual */}
+          <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+            <div className="flex items-center space-x-2">
+              <dt className="text-sm font-medium text-gray-500">Status Atual:</dt>
+              <dd className="text-sm font-medium text-gray-900">
+                {statusMessages[process.status as keyof typeof statusMessages]}
+              </dd>
+            </div>
           </div>
 
           {/* Timeline */}
@@ -149,14 +143,14 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
             <div className="bg-gray-50 px-4 py-5 sm:px-6">
               <div className="flow-root">
                 <ul role="list" className="-mb-8">
-                  {process.history.map((event, eventIdx) => {
+                  {process.history?.map((event, eventIdx) => {
                     const Icon = statusIcons[event.status as keyof typeof statusIcons] || Clock
                     const colorClass = statusColors[event.status as keyof typeof statusColors] || 'bg-gray-400'
                     
                     return (
                       <li key={event.id}>
                         <div className="relative pb-8">
-                          {eventIdx !== process.history.length - 1 ? (
+                          {eventIdx !== (process.history?.length || 0) - 1 ? (
                             <span
                               className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"
                               aria-hidden="true"

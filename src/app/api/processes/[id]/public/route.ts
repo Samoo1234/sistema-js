@@ -6,17 +6,25 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    console.log('[PROCESS_PUBLIC_GET] Buscando processo:', params.id)
+    
     // Buscar processo e cliente
     const result = await query(
       `SELECT p.*, c.name as "clientName", c.email as "clientEmail"
-       FROM "Process" p
-       LEFT JOIN "Client" c ON c.id = p."clientId"
+       FROM app.processes p
+       LEFT JOIN app.clients c ON c.id = p.client_id
        WHERE p.id = $1
        LIMIT 1`,
       [params.id]
     )
 
     const process = result.rows[0]
+    console.log('[PROCESS_PUBLIC_GET] Processo encontrado:', {
+      id: process?.id,
+      title: process?.title,
+      status: process?.status,
+      clientName: process?.clientName
+    })
 
     if (!process) {
       return new NextResponse('Processo não encontrado', { status: 404 })
@@ -24,11 +32,20 @@ export async function GET(
 
     // Buscar histórico do processo
     const historyResult = await query(
-      `SELECT * FROM "ProcessHistory"
-       WHERE "processId" = $1
-       ORDER BY "createdAt" DESC`,
+      `SELECT 
+        id,
+        status,
+        observation,
+        attachments,
+        created_by as "createdBy",
+        created_at as "createdAt"
+       FROM app.process_history
+       WHERE process_id = $1
+       ORDER BY created_at DESC`,
       [params.id]
     )
+
+    console.log('[PROCESS_PUBLIC_GET] Histórico encontrado:', historyResult.rows)
 
     return NextResponse.json({
       ...process,
