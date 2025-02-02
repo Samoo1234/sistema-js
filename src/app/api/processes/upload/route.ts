@@ -14,6 +14,7 @@ interface SessionUser {
 
 export async function POST(request: Request) {
   try {
+    console.log('[PROCESS_UPLOAD] Iniciando upload...')
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -25,6 +26,9 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File
     const processId = formData.get('processId') as string
 
+    console.log('[PROCESS_UPLOAD] Arquivo:', file.name)
+    console.log('[PROCESS_UPLOAD] Processo ID:', processId)
+
     if (!file) {
       return new NextResponse('Arquivo não encontrado', { status: 400 })
     }
@@ -34,6 +38,7 @@ export async function POST(request: Request) {
     }
 
     // Verifica se o processo existe e pertence ao usuário
+    console.log('[PROCESS_UPLOAD] Verificando processo...')
     const processResult = await query(
       'SELECT * FROM app.processes WHERE id = $1 AND user_id = $2',
       [processId, user.id]
@@ -44,6 +49,7 @@ export async function POST(request: Request) {
     }
 
     // Cria o diretório de uploads se não existir
+    console.log('[PROCESS_UPLOAD] Salvando arquivo...')
     const uploadDir = join(process.cwd(), 'uploads', processId)
     try {
       await mkdir(uploadDir, { recursive: true })
@@ -53,17 +59,40 @@ export async function POST(request: Request) {
       }
     }
     await writeFile(join(uploadDir, file.name), Buffer.from(await file.arrayBuffer()))
+    console.log('[PROCESS_UPLOAD] Arquivo salvo com sucesso')
+
+    // Registra o documento no banco de dados
+    console.log('[PROCESS_UPLOAD] Registrando documento no banco...')
+    const documentResult = await query(
+      `INSERT INTO app.process_documents (
+        id,
+        process_id,
+        filename,
+        type,
+        created_at,
+        updated_at
+      ) VALUES (gen_random_uuid(), $1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING *`,
+      [
+        processId,
+        file.name,
+        'personal' // ou 'additional' dependendo do tipo
+      ]
+    )
+    console.log('[PROCESS_UPLOAD] Documento registrado:', documentResult.rows[0])
 
     // Registra o upload no histórico
+    console.log('[PROCESS_UPLOAD] Registrando no histórico...')
     await query(
       `INSERT INTO app.process_history (
+        id,
         process_id,
         status,
         observation,
         attachments,
         created_by,
         created_at
-      ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+      ) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
       [
         processId,
         'DOCUMENTO_ANEXADO',
@@ -72,10 +101,16 @@ export async function POST(request: Request) {
         user.email || 'sistema'
       ]
     )
+    console.log('[PROCESS_UPLOAD] Histórico registrado')
 
-    return new NextResponse(null, { status: 200 })
+    return NextResponse.json({ success: true, document: documentResult.rows[0] })
   } catch (error) {
-    console.error('[PROCESS_UPLOAD]', error)
-    return new NextResponse('Internal error', { status: 500 })
+    console.error('[PROCESS_UPLOAD] Erro:', error)
+    return NextResponse.json({ 
+      error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, { 
+      status: 500 
+    })
   }
 } 

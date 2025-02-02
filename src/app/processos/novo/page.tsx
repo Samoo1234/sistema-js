@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 
 interface Client {
   id: string
@@ -10,10 +11,16 @@ interface Client {
 }
 
 export default function NovoProcessoPage() {
+  const { data: session, status } = useSession()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [priority, setPriority] = useState('MEDIUM')
   const [clients, setClients] = useState<Client[]>([])
+  const [uploadingFiles, setUploadingFiles] = useState<{
+    file: File;
+    progress: number;
+  }[]>([])
   const [success, setSuccess] = useState<{
     loginToken: string
     password: string
@@ -36,43 +43,36 @@ export default function NovoProcessoPage() {
     loadClients()
   }, [])
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
     setLoading(true)
     setError('')
-    setSuccess(null)
-
-    const formData = new FormData(e.currentTarget)
-    const data = {
-      title: formData.get('title'),
-      description: formData.get('description'),
-      clientId: formData.get('clientId'),
-      priority: formData.get('priority')
-    }
 
     try {
+      const formData = new FormData(event.currentTarget)
+      formData.set('priority', priority)
+
+      // Enviar formulário
       const response = await fetch('/api/processes', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
+        body: formData
       })
 
       if (!response.ok) {
-        const error = await response.text()
-        throw new Error(error)
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao cadastrar processo')
       }
 
-      const result = await response.json()
-      setSuccess(result.credentials)
-      
+      const data = await response.json()
+      setSuccess(data.credentials)
+
       // Redirecionar para a lista de processos após 5 segundos
       setTimeout(() => {
         router.push('/processos')
       }, 5000)
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erro ao criar processo')
+      console.error('[CREATE_PROCESS_ERROR]', error)
+      setError(error instanceof Error ? error.message : 'Ocorreu um erro ao cadastrar o processo. Por favor, tente novamente.')
     } finally {
       setLoading(false)
     }

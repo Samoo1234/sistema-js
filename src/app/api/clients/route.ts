@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { query } from '@/lib/db'
 import { authOptions } from '@/lib/auth'
 import crypto from 'crypto'
+import { join } from 'path'
+import { mkdir, writeFile } from 'fs/promises'
 
 interface SessionUser {
   id: string
@@ -25,72 +27,134 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return new NextResponse('Unauthorized', { status: 401 })
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
     const user = session.user as SessionUser
-
     const formData = await request.formData()
-
+    
+    // Extrair dados do cliente
     const name = formData.get('name') as string
     const email = formData.get('email') as string
     const phone = formData.get('phone') as string
     const document = formData.get('document') as string
-    const rg = formData.get('rg') as string
-    const documentType = formData.get('documentType') as string
     const type = formData.get('type') as string
     const address = formData.get('address') as string
     const city = formData.get('city') as string
     const state = formData.get('state') as string
     const postalCode = formData.get('postalCode') as string
     const notes = formData.get('notes') as string
+    const personalDocs = formData.getAll('personalDocs') as File[]
+    const additionalDocs = formData.getAll('additionalDocs') as File[]
 
     if (!name) {
-      return new NextResponse('Nome é obrigatório', { status: 400 })
+      return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
     }
 
-    const result = await query(
+    if (!document) {
+      return NextResponse.json({ error: 'Documento é obrigatório' }, { status: 400 })
+    }
+
+    // Criar cliente
+    const clientResult = await query(
       `INSERT INTO app.clients (
-        name, 
-        email, 
-        phone, 
-        document, 
-        rg, 
-        document_type, 
-        type, 
-        address, 
-        city, 
-        state, 
-        postal_code, 
-        status, 
+        name,
+        email,
+        phone,
+        document,
+        type,
+        address,
+        city,
+        state,
+        postal_code,
         notes,
-        created_at, 
-        updated_at, 
-        user_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $14)
-      RETURNING *`,
+        user_id,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING id`,
       [
         name,
         email,
         phone,
         document,
-        rg,
-        documentType,
         type,
         address,
         city,
         state,
         postalCode,
-        'active',
         notes,
         user.id
       ]
     )
 
-    return NextResponse.json(result.rows[0])
+    const clientId = clientResult.rows[0].id
+
+    // Processar documentos pessoais
+    if (personalDocs.length > 0) {
+      const uploadDir = join(process.cwd(), 'uploads', 'clients', clientId.toString())
+      await mkdir(uploadDir, { recursive: true })
+
+      // Salvar cada documento pessoal
+      for (const file of personalDocs) {
+        // Salvar arquivo
+        await writeFile(
+          join(uploadDir, file.name),
+          Buffer.from(await file.arrayBuffer())
+        )
+
+        // Registrar no banco
+        await query(
+          `INSERT INTO app.client_documents (
+            id,
+            client_id,
+            filename,
+            type,
+            created_at,
+            updated_at
+          ) VALUES (gen_random_uuid(), $1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [clientId, file.name, 'personal']
+        )
+      }
+    }
+
+    // Processar documentos complementares
+    if (additionalDocs.length > 0) {
+      const uploadDir = join(process.cwd(), 'uploads', 'clients', clientId.toString())
+      await mkdir(uploadDir, { recursive: true })
+
+      // Salvar cada documento complementar
+      for (const file of additionalDocs) {
+        // Salvar arquivo
+        await writeFile(
+          join(uploadDir, file.name),
+          Buffer.from(await file.arrayBuffer())
+        )
+
+        // Registrar no banco
+        await query(
+          `INSERT INTO app.client_documents (
+            id,
+            client_id,
+            filename,
+            type,
+            created_at,
+            updated_at
+          ) VALUES (gen_random_uuid(), $1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [clientId, file.name, 'additional']
+        )
+      }
+    }
+
+    return NextResponse.json({ id: clientId })
   } catch (error) {
-    console.log('[CLIENTS_POST]', error)
-    return new NextResponse('Internal error', { status: 500 })
+    console.error('[CLIENT_CREATE]', error)
+    return NextResponse.json({ 
+      error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, { 
+      status: 500 
+    })
   }
 }
 
@@ -139,4 +203,4 @@ export async function GET(request: Request) {
     console.log('[CLIENTS_GET]', error)
     return new NextResponse('Internal error', { status: 500 })
   }
-} 
+}

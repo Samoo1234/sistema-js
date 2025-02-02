@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { AlertCircle, CheckCircle2, XCircle, Clock, FileText } from 'lucide-react'
 
 interface ProcessHistory {
   id: string
@@ -10,6 +10,13 @@ interface ProcessHistory {
   observation: string
   createdAt: string
   createdBy: string
+}
+
+interface ProcessDocument {
+  id: string
+  name: string
+  createdAt: string
+  type: 'personal' | 'additional'
 }
 
 interface Process {
@@ -22,6 +29,7 @@ interface Process {
   clientEmail: string
   createdAt: string
   history: ProcessHistory[]
+  documents: ProcessDocument[]
 }
 
 const statusMessages = {
@@ -68,22 +76,20 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
   const [process, setProcess] = useState<Process | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [uploadingFiles, setUploadingFiles] = useState<{
-    file: File;
-    progress: number;
-  }[]>([])
 
   async function loadProcess() {
     try {
       const response = await fetch(`/api/processes/${params.id}`)
-      if (!response.ok) {
-        throw new Error('Erro ao carregar processo')
-      }
       const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao carregar processo')
+      }
+      
       setProcess(data)
     } catch (error) {
       console.error('Erro ao carregar processo:', error)
-      setError('Não foi possível carregar os dados do processo')
+      setError(error instanceof Error ? error.message : 'Não foi possível carregar os dados do processo')
     } finally {
       setLoading(false)
     }
@@ -92,58 +98,6 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
   useEffect(() => {
     loadProcess()
   }, [params.id])
-
-  async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files || [])
-    
-    setUploadingFiles(files.map(file => ({
-      file,
-      progress: 0
-    })))
-
-    for (let i = 0; i < files.length; i++) {
-      const formData = new FormData()
-      formData.append('file', files[i])
-      formData.append('processId', params.id)
-
-      try {
-        const xhr = new XMLHttpRequest()
-        
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            const progress = Math.round((e.loaded * 100) / e.total)
-            setUploadingFiles(prev => {
-              const newFiles = [...prev]
-              newFiles[i] = { ...newFiles[i], progress }
-              return newFiles
-            })
-          }
-        })
-
-        await new Promise((resolve, reject) => {
-          xhr.open('POST', '/api/processes/upload')
-          
-          xhr.onload = () => {
-            if (xhr.status === 200) {
-              resolve(xhr.response)
-            } else {
-              reject(xhr.statusText)
-            }
-          }
-          
-          xhr.onerror = () => reject(xhr.statusText)
-          xhr.send(formData)
-        })
-
-      } catch (error) {
-        console.error('Erro ao fazer upload:', error)
-        setError('Erro ao fazer upload do arquivo')
-      }
-    }
-
-    // Recarrega os dados do processo após o upload
-    loadProcess()
-  }
 
   if (loading) {
     return (
@@ -255,7 +209,7 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
                                 )}
                               </div>
                               <div className="whitespace-nowrap text-right text-sm text-gray-500">
-                                {new Date(event.createdAt).toLocaleDateString('pt-BR')}
+                                {event.createdAt ? new Date(event.createdAt).toLocaleDateString('pt-BR') : 'Data não disponível'}
                               </div>
                             </div>
                           </div>
@@ -267,44 +221,41 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Upload de Documentos */}
-        <div className="mt-8 bg-white shadow sm:rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">
-              Documentos do Processo
-            </h3>
-            
-            <div className="mt-4">
-              <input
-                type="file"
-                multiple
-                onChange={handleFileUpload}
-                className="block w-full text-sm text-gray-500
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-full file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-primary-50 file:text-primary-700
-                  hover:file:bg-primary-100"
-              />
+          {/* Documentos */}
+          <div className="border-t border-gray-200">
+            <div className="bg-white px-4 py-5 sm:px-6">
+              <h4 className="text-lg font-medium text-gray-900 mb-4">Documentos do Processo</h4>
+              
+              {process.documents && process.documents.length > 0 ? (
+                <div className="space-y-4">
+                  {process.documents.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">
+                          <FileText className="h-6 w-6 text-gray-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{doc.name}</p>
+                          <p className="text-sm text-gray-500">
+                            {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('pt-BR') : 'Data não disponível'}
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={`/api/processes/${params.id}/documents/${doc.id}`}
+                        download
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        Download
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Nenhum documento anexado.</p>
+              )}
             </div>
-
-            {/* Barra de Progresso */}
-            {uploadingFiles.map((file, index) => (
-              <div key={index} className="mt-4">
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>{file.file.name}</span>
-                  <span>{file.progress}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5 mt-1">
-                  <div
-                    className="bg-primary-600 h-2.5 rounded-full transition-all duration-300"
-                    style={{ width: `${file.progress}%` }}
-                  />
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>

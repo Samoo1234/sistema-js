@@ -67,50 +67,17 @@ export default function NovoClientePage() {
       formData.set('type', clientType)
       formData.set('documentType', documentType)
 
-      // Upload dos arquivos com progresso
-      const uploadPromises = []
-
-      // Arquivos pessoais
-      personalFiles.forEach((selectedFile, index) => {
-        const promise = new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest()
-          
-          xhr.upload.addEventListener('progress', (e) => {
-            if (e.lengthComputable) {
-              const progress = Math.round((e.loaded * 100) / e.total)
-              updateFileProgress(index, progress, 'personal')
-            }
-          })
-
-          xhr.addEventListener('load', () => resolve(xhr.response))
-          xhr.addEventListener('error', () => reject(xhr.statusText))
-
-          formData.append('personalDocs', selectedFile.file)
-        })
-        uploadPromises.push(promise)
+      // Adicionar documentos pessoais
+      personalFiles.forEach((selectedFile) => {
+        formData.append('personalDocs', selectedFile.file)
       })
 
-      // Arquivos complementares
-      additionalFiles.forEach((selectedFile, index) => {
-        const promise = new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest()
-          
-          xhr.upload.addEventListener('progress', (e) => {
-            if (e.lengthComputable) {
-              const progress = Math.round((e.loaded * 100) / e.total)
-              updateFileProgress(index, progress, 'additional')
-            }
-          })
-
-          xhr.addEventListener('load', () => resolve(xhr.response))
-          xhr.addEventListener('error', () => reject(xhr.statusText))
-
-          formData.append('additionalDocs', selectedFile.file)
-        })
-        uploadPromises.push(promise)
+      // Adicionar documentos complementares
+      additionalFiles.forEach((selectedFile) => {
+        formData.append('additionalDocs', selectedFile.file)
       })
 
-      // Enviar formulário com os arquivos
+      // Enviar formulário
       const response = await fetch('/api/clients', {
         method: 'POST',
         body: formData
@@ -118,7 +85,7 @@ export default function NovoClientePage() {
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.message || 'Erro ao cadastrar cliente')
+        throw new Error(data.error || 'Erro ao cadastrar cliente')
       }
 
       // Redirecionar para a lista de clientes
@@ -206,7 +173,7 @@ export default function NovoClientePage() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Nome *
+                  {clientType === 'INDIVIDUAL' ? 'Nome *' : 'Razão Social *'}
                 </label>
                 <input
                   type="text"
@@ -244,17 +211,25 @@ export default function NovoClientePage() {
 
               <div>
                 <label htmlFor="document" className="block text-sm font-medium text-gray-700">
-                  CPF *
+                  {clientType === 'INDIVIDUAL' ? 'CPF *' : 'CNPJ *'}
                 </label>
                 <input
                   type="text"
                   name="document"
                   id="document"
                   required
-                  maxLength={11}
+                  maxLength={clientType === 'INDIVIDUAL' ? 11 : 14}
                   placeholder="Apenas números"
                   onChange={(e) => {
+                    // Remove caracteres não numéricos
                     e.target.value = e.target.value.replace(/\D/g, '')
+                    
+                    // Limita o tamanho baseado no tipo de documento
+                    if (clientType === 'INDIVIDUAL' && e.target.value.length > 11) {
+                      e.target.value = e.target.value.slice(0, 11)
+                    } else if (clientType === 'COMPANY' && e.target.value.length > 14) {
+                      e.target.value = e.target.value.slice(0, 14)
+                    }
                   }}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                 />
@@ -281,7 +256,7 @@ export default function NovoClientePage() {
           {/* Upload de Documentos Pessoais */}
           <div className="mt-6">
             <label className="block text-sm font-medium text-gray-700">
-              Documentos Pessoais
+              Documentos Pessoais (RG, CNH)
             </label>
             <div className="mt-2">
               <input
@@ -296,6 +271,9 @@ export default function NovoClientePage() {
                   hover:file:bg-primary-100"
               />
             </div>
+            <p className="mt-2 text-sm text-gray-500">
+              Faça upload dos seus documentos pessoais (RG, CNH)
+            </p>
             {personalFiles.map((file, index) => (
               <div key={index} className="mt-2">
                 <div className="text-sm text-gray-600">{file.file.name}</div>
@@ -327,6 +305,9 @@ export default function NovoClientePage() {
                   hover:file:bg-primary-100"
               />
             </div>
+            <p className="mt-2 text-sm text-gray-500">
+              Faça upload de documentos adicionais (comprovante de residência, etc)
+            </p>
             {additionalFiles.map((file, index) => (
               <div key={index} className="mt-2">
                 <div className="text-sm text-gray-600">{file.file.name}</div>
@@ -395,21 +376,6 @@ export default function NovoClientePage() {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                 />
               </div>
-            </div>
-          </div>
-
-          {/* Observações */}
-          <div>
-            <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-              Observações
-            </label>
-            <div className="mt-1">
-              <textarea
-                id="notes"
-                name="notes"
-                rows={4}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
             </div>
           </div>
 

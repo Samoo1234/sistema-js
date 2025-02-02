@@ -69,6 +69,18 @@ async function setupDatabase() {
       );
     `
 
+    // Criar tabela de documentos do processo
+    await query(`
+      CREATE TABLE IF NOT EXISTS app.process_documents (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        process_id UUID NOT NULL REFERENCES app.processes(id) ON DELETE CASCADE,
+        filename VARCHAR(255) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
     // Criar tabelas
     await query(createUsersTable)
     await query(createClientsTable)

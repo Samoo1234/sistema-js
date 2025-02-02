@@ -4,6 +4,8 @@ import { query } from '@/lib/db'
 import { authOptions } from '@/lib/auth'
 import crypto from 'crypto'
 import { hash } from 'bcryptjs'
+import { writeFile, mkdir } from 'fs/promises'
+import { join } from 'path'
 
 interface SessionUser {
   id: string
@@ -17,113 +19,141 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return new NextResponse('Unauthorized', { status: 401 })
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
     const user = session.user as SessionUser
-    let body;
+    const formData = await request.formData()
     
-    try {
-      body = await request.json()
-    } catch (parseError) {
-      console.log('[PROCESSES_POST] Erro ao fazer parse do body:', parseError)
-      return new NextResponse('Erro ao processar dados', { status: 400 })
-    }
-
-    const {
-      title,
-      description,
-      clientId,
-      priority = 'MEDIUM'
-    } = body
+    // Extrair dados do processo
+    const title = formData.get('title') as string
+    const description = formData.get('description') as string
+    const clientId = formData.get('clientId') as string
+    const priority = formData.get('priority') as string
+    const documents = formData.getAll('documents') as File[]
 
     if (!title) {
-      return new NextResponse('Título é obrigatório', { status: 400 })
+      return NextResponse.json({ error: 'Título é obrigatório' }, { status: 400 })
     }
 
     if (!clientId) {
-      return new NextResponse('Cliente é obrigatório', { status: 400 })
+      return NextResponse.json({ error: 'Cliente é obrigatório' }, { status: 400 })
     }
 
-    // Gerar token e senha de acesso
-    const loginToken = crypto.randomBytes(6).toString('hex').toUpperCase()
-    const password = crypto.randomBytes(4).toString('hex').toUpperCase()
-    const hashedPassword = await hash(password, 10)
+    // Gerar credenciais
+    const loginToken = crypto.randomBytes(4).toString('hex')
+    const password = crypto.randomBytes(4).toString('hex')
+    const hashedPassword = await hash(password, 12)
 
-    console.log('[PROCESSES_POST] Dados do processo:', {
-      title,
-      description,
-      clientId,
-      priority,
-      userId: user.id
-    })
-
-    // Criar o processo
-    const result = await query(
-      `WITH inserted_process AS (
-        INSERT INTO app.processes (
-          title,
-          description,
-          status,
-          priority,
-          login_token,
-          password,
-          created_at,
-          updated_at,
-          user_id,
-          client_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $7, $8)
-        RETURNING *
-      )
-      SELECT 
-        p.*,
-        c.name as "clientName",
-        p.created_at as "createdAt"
-      FROM inserted_process p
-      LEFT JOIN app.clients c ON c.id = p.client_id`,
+    // Criar processo
+    const processResult = await query(
+      `INSERT INTO app.processes (
+        id,
+        title,
+        description,
+        client_id,
+        priority,
+        login_token,
+        password,
+        user_id,
+        created_at,
+        updated_at
+      ) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING id`,
       [
         title,
         description,
-        'CADASTRO_REALIZADO',
-        priority,
+        clientId,
+        priority || 'MEDIUM',
         loginToken,
         hashedPassword,
-        user.id,
-        clientId
+        user.id
       ]
     )
 
-    const process = result.rows[0]
+    const processId = processResult.rows[0].id
 
-    // Criar histórico inicial
-    await query(
-      `INSERT INTO app.process_history (
-        process_id,
-        status,
-        observation,
-        attachments,
-        created_by,
-        created_at
-      ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
-      [
-        process.id,
-        'CADASTRO_REALIZADO',
-        'Processo cadastrado com sucesso',
-        [],
-        user.email || 'sistema'
-      ]
-    )
+    // Criar diretório para documentos
+    if (documents.length > 0) {
+      const uploadDir = join(process.cwd(), 'uploads', processId)
+      await mkdir(uploadDir, { recursive: true })
+
+      // Salvar cada documento
+      for (const file of documents) {
+        // Salvar arquivo
+        await writeFile(
+          join(uploadDir, file.name),
+          Buffer.from(await file.arrayBuffer())
+        )
+
+        // Registrar no banco
+        await query(
+          `INSERT INTO app.process_documents (
+            id,
+            process_id,
+            filename,
+            type,
+            created_at,
+            updated_at
+          ) VALUES (gen_random_uuid(), $1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [processId, file.name, 'personal']
+        )
+      }
+
+      // Registrar no histórico
+      await query(
+        `INSERT INTO app.process_history (
+          id,
+          process_id,
+          status,
+          observation,
+          attachments,
+          created_by,
+          created_at
+        ) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+        [
+          processId,
+          'CADASTRO_REALIZADO',
+          `Processo cadastrado com ${documents.length} documento(s)`,
+          documents.map(doc => doc.name),
+          user.email || 'sistema'
+        ]
+      )
+    } else {
+      // Registrar histórico sem documentos
+      await query(
+        `INSERT INTO app.process_history (
+          id,
+          process_id,
+          status,
+          observation,
+          created_by,
+          created_at
+        ) VALUES (gen_random_uuid(), $1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+        [
+          processId,
+          'CADASTRO_REALIZADO',
+          'Processo cadastrado com sucesso',
+          user.email || 'sistema'
+        ]
+      )
+    }
 
     return NextResponse.json({
-      ...process,
+      id: processId,
       credentials: {
         loginToken,
         password
       }
     })
   } catch (error) {
-    console.log('[PROCESSES_POST] Erro detalhado:', error)
-    return new NextResponse('Internal error', { status: 500 })
+    console.error('[PROCESS_CREATE]', error)
+    return NextResponse.json({ 
+      error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, { 
+      status: 500 
+    })
   }
 }
 
