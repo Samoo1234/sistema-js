@@ -47,6 +47,11 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (process?.history) {
+    }
+  }, [process?.history]);
+
+  useEffect(() => {
     async function loadProcess() {
       try {
         const response = await fetch(`/api/processes/${params.id}/public`)
@@ -56,7 +61,6 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
         }
 
         const data = await response.json()
-        console.log('[DEBUG] Dados do processo:', data)
         setProcess(data)
       } catch (error) {
         console.error('[LOAD_PROCESS_ERROR]', error)
@@ -67,6 +71,8 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
     }
 
     loadProcess()
+    const intervalId = setInterval(loadProcess, 10000)
+    return () => clearInterval(intervalId)
   }, [params.id])
 
   if (loading) {
@@ -104,86 +110,88 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white shadow sm:rounded-lg">
-          {/* Cabeçalho */}
           <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">
-              {process.title}
-            </h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">
-              Detalhes e andamento do processo
-            </p>
-          </div>
-
-          {/* Informações do Cliente */}
-          <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-            <dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
-              <div className="sm:col-span-1">
-                <dt className="text-sm font-medium text-gray-500">Nome</dt>
-                <dd className="mt-1 text-sm text-gray-900">{process.clientName}</dd>
-              </div>
-              <div className="sm:col-span-1">
-                <dt className="text-sm font-medium text-gray-500">Email</dt>
-                <dd className="mt-1 text-sm text-gray-900">{process.clientEmail}</dd>
-              </div>
-            </dl>
-          </div>
-
-          {/* Status Atual */}
-          <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-            <div className="flex items-center space-x-2">
-              <dt className="text-sm font-medium text-gray-500">Status Atual:</dt>
-              <dd className="text-sm font-medium text-gray-900">
-                {statusMessages[process.status as keyof typeof statusMessages]}
-              </dd>
+            {/* Cabeçalho */}
+            <div className="mb-6">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">
+                {process.title}
+              </h3>
+              <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                Detalhes e andamento do processo
+              </p>
             </div>
-          </div>
 
-          {/* Timeline */}
-          <div className="border-t border-gray-200">
-            <div className="bg-gray-50 px-4 py-5 sm:px-6">
-              <div className="flow-root">
-                <ul role="list" className="-mb-8">
-                  {process.history?.map((event, eventIdx) => {
-                    const Icon = statusIcons[event.status as keyof typeof statusIcons] || Clock
-                    const colorClass = statusColors[event.status as keyof typeof statusColors] || 'bg-gray-400'
-                    
+            {/* Informações do Cliente */}
+            <div className="mb-6">
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                <div className="sm:col-span-1">
+                  <dt className="text-sm font-medium text-gray-500">Nome</dt>
+                  <dd className="mt-1 text-sm text-gray-900">{process.clientName}</dd>
+                </div>
+                <div className="sm:col-span-1">
+                  <dt className="text-sm font-medium text-gray-500">Email</dt>
+                  <dd className="mt-1 text-sm text-gray-900">{process.clientEmail}</dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Status Atual */}
+            <div className="mb-6">
+              <div className="flex items-center space-x-2">
+                <dt className="text-sm font-medium text-gray-500">Status Atual:</dt>
+                <dd className="text-sm font-medium text-gray-900">
+                  {statusMessages[process.status as keyof typeof statusMessages]}
+                </dd>
+              </div>
+            </div>
+
+            {/* Timeline */}
+            <div className="flow-root min-h-[100px]">
+              <ul role="list" className="flex justify-between items-center">
+                {process.history && process.history.length > 0 ? (
+                  [...process.history].reverse().map((event, eventIdx) => {
+                    const Icon = statusIcons[event.status as keyof typeof statusIcons] || Clock;
+                    const colorClass = statusColors[event.status as keyof typeof statusColors] || 'bg-gray-400';
+
                     return (
-                      <li key={event.id}>
-                        <div className="relative pb-8">
+                      <li key={event.id} className="flex-1 relative">
+                        <div className="relative flex flex-col items-center">
                           {eventIdx !== (process.history?.length || 0) - 1 ? (
                             <span
-                              className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"
+                              className="absolute left-full top-4 w-full h-0.5 bg-gray-200"
                               aria-hidden="true"
                             />
                           ) : null}
-                          <div className="relative flex space-x-3">
-                            <div>
-                              <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${colorClass}`}>
-                                <Icon className="h-5 w-5 text-white" aria-hidden="true" />
-                              </span>
-                            </div>
-                            <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
-                              <div>
-                                <p className="text-sm text-gray-500">
-                                  {statusMessages[event.status as keyof typeof statusMessages]}
-                                </p>
-                                {event.observation && (
-                                  <p className="mt-1 text-sm text-gray-900">
-                                    {event.observation}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="whitespace-nowrap text-right text-sm text-gray-500">
-                                {new Date(event.createdAt).toLocaleDateString('pt-BR')}
-                              </div>
-                            </div>
+                          <span className={`h-12 w-12 rounded-full flex items-center justify-center ring-4 ring-white ${colorClass}`}>
+                            <Icon className="h-6 w-6 text-white" aria-hidden="true" />
+                          </span>
+                          <div className="mt-2 text-center">
+                            <p className="text-sm text-gray-500">
+                              {statusMessages[event.status as keyof typeof statusMessages]}
+                            </p>
+                            {event.observation && (
+                              <p className="mt-1 text-xs text-gray-500">
+                                {event.observation}
+                              </p>
+                            )}
+                            <p className="mt-1 text-xs text-gray-400">
+                              {new Date(event.createdAt).toLocaleDateString('pt-BR')}
+                            </p>
                           </div>
                         </div>
                       </li>
-                    )
-                  })}
-                </ul>
-              </div>
+                    );
+                  })
+                ) : (
+                  <li>
+                    <div className="relative pb-8 bg-white p-4 rounded-lg">
+                      <div className="flex items-center justify-center">
+                        <p className="text-sm text-gray-500">Nenhum evento encontrado.</p>
+                      </div>
+                    </div>
+                  </li>
+                )}
+              </ul>
             </div>
           </div>
         </div>
