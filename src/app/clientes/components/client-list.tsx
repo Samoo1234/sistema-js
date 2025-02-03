@@ -8,7 +8,8 @@ import {
   Loader2,
   X,
   Pencil,
-  Trash
+  Trash,
+  FileText
 } from 'lucide-react'
 
 type Client = {
@@ -190,14 +191,23 @@ export default function ClientList({ initialClients }: ClientListProps) {
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                           <div className="flex justify-end gap-2">
                             <Link
+                              href={`/processos/novo?clientId=${client.id}`}
+                              className="text-primary-600 hover:text-primary-900"
+                              title="Criar Processo"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Link>
+                            <Link
                               href={`/clientes/${client.id}/editar`}
                               className="text-primary-600 hover:text-primary-900"
+                              title="Editar Cliente"
                             >
                               <Pencil className="h-4 w-4" />
                             </Link>
                             <button
                               onClick={() => handleDeleteClick(client)}
                               className="text-red-600 hover:text-red-900"
+                              title="Excluir Cliente"
                             >
                               <Trash className="h-4 w-4" />
                             </button>

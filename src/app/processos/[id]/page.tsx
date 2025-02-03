@@ -2,8 +2,26 @@
 
 import { useEffect, useState } from 'react'
 import { ProcessStatusManager } from '@/components/ProcessStatusManager'
-import { Process, ProcessHistory } from '@/types'
+import { ProcessHistory } from '@/types'
 import { AlertCircle, CheckCircle2, XCircle, Clock } from 'lucide-react'
+
+interface Document {
+  id: string
+  name: string
+  type: string
+  createdAt: string
+}
+
+interface Process {
+  id: string
+  title: string
+  status: string
+  priority: string
+  clientName: string
+  clientEmail: string
+  history?: ProcessHistory[]
+  documents?: Document[]
+}
 
 const statusColors = {
   CADASTRO_REALIZADO: 'bg-blue-500',
@@ -85,7 +103,35 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
                 </dd>
               </div>
             </dl>
+          </div>
+
+          {/* Lista de Documentos */}
+          <div className="mt-6 border-t border-gray-200">
+            <h4 className="text-lg font-medium leading-6 text-gray-900 mt-4">Documentos do Cliente</h4>
+            <div className="mt-4">
+              {(process.documents && process.documents.length > 0) ? (
+                <ul className="divide-y divide-gray-200">
+                  {process.documents.map((doc) => (
+                    <li key={doc.id} className="py-4 flex justify-between items-center">
+                      <div className="flex items-center">
+                        <span className="text-sm font-medium text-gray-900">{doc.name}</span>
+                        <span className="ml-2 text-sm text-gray-500">({doc.type})</span>
+                      </div>
+                      <a
+                        href={`/api/documents/${doc.id}`}
+                        download
+                        className="ml-4 px-3 py-1 text-sm font-medium text-primary-600 hover:text-primary-700 rounded-md hover:bg-primary-50"
+                      >
+                        Download
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500">Nenhum documento encontrado.</p>
+              )}
             </div>
+          </div>
 
           {/* Gerenciador de Status */}
           <ProcessStatusManager 

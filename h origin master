@@ -1,0 +1,5 @@
+[33mf05c9d2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m feat: melhoria na visualização da timeline do processo, implementando layout horizontal com ícones e status
+[33mb59d9e6[m feat: melhoria na visualização da timeline do processo, implementando layout horizontal com ícones e status
+[33m114995b[m[33m ([m[1;31morigin/master[m[33m)[m feat: Implementação inicial da esteira de processo com status e histórico
+[33me796d51[m[33m ([m[1;32mbackup-master[m[33m)[m refactor: Melhorias no sistema de documentos - Remove upload de documentos da página de processo - Vincula documentos diretamente ao cliente - Corrige mensagem de histórico no cadastro - Restaura exibição de credenciais após cadastro - Mantém layout e funcionalidades existentes
+[33md458b53[m feat: implementa upload de documentos com progresso em tempo real
