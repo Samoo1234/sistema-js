@@ -136,6 +136,12 @@ export default async function DashboardPage() {
             <div className="border-b border-gray-200">
               <div className="-mb-px flex space-x-8">
                 <Link
+                  href="/dashboard"
+                  className="border-primary-500 text-primary-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm"
+                >
+                  Visão Geral
+                </Link>
+                <Link
                   href="/clientes"
                   className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center"
                 >
@@ -148,12 +154,6 @@ export default async function DashboardPage() {
                 >
                   <FileText className="mr-2 h-4 w-4" />
                   Processos
-                </Link>
-                <Link
-                  href="/dashboard"
-                  className="border-primary-500 text-primary-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm"
-                >
-                  Visão Geral
                 </Link>
                 <Link
                   href="/relatorios"
