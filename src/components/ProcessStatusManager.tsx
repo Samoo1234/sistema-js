@@ -11,6 +11,9 @@ export function ProcessStatusManager({ processId, currentStatus }: ProcessStatus
   const [observation, setObservation] = useState('')
   const router = useRouter()
 
+  // Normaliza o status para maiúsculas
+  const normalizedStatus = currentStatus.toUpperCase()
+
   const nextStatus = {
     CADASTRO_REALIZADO: 'EM_ANALISE_DOCUMENTOS',
     EM_ANALISE_DOCUMENTOS: ['DOCUMENTOS_APROVADOS', 'DOCUMENTOS_REPROVADOS']
@@ -51,7 +54,7 @@ export function ProcessStatusManager({ processId, currentStatus }: ProcessStatus
     }
   }
 
-  const availableStatus = nextStatus[currentStatus as keyof typeof nextStatus]
+  const availableStatus = nextStatus[normalizedStatus as keyof typeof nextStatus]
   if (!availableStatus) return null
 
   return (
