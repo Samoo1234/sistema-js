@@ -26,6 +26,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.11.11",
+    "@vercel/postgres": "^0.10.0",
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
     "lucide-react": "^0.474.0",

@@ -10,6 +10,89 @@ import {
   Bell,
   Search
 } from 'lucide-react'
+import { query } from '@/lib/db'
+
+interface RecentActivity {
+  process_title: string
+  status: string
+  observation: string | null
+  created_at: Date
+  client_name: string
+}
+
+interface DashboardData {
+  totalProcesses: number
+  totalClients: number
+  activeProcesses: number
+  completedProcesses: number
+  recentActivities: RecentActivity[]
+}
+
+async function getDashboardData(userEmail: string): Promise<DashboardData> {
+  // Primeiro vamos pegar o ID do usuário
+  const { rows: userRows } = await query(
+    'SELECT id FROM app.users WHERE email = $1',
+    [userEmail]
+  )
+  const userId = userRows[0].id
+
+  const { rows: totalProcesses } = await query(
+    'SELECT COUNT(*) as total FROM app.processes WHERE user_id = $1',
+    [userId]
+  )
+
+  const { rows: totalClients } = await query(
+    'SELECT COUNT(*) as total FROM app.clients WHERE user_id = $1',
+    [userId]
+  )
+
+  const { rows: activeProcesses } = await query(
+    `SELECT COUNT(*) as total 
+    FROM app.processes 
+    WHERE user_id = $1 
+    AND status NOT IN ('DOCUMENTOS_APROVADOS', 'DOCUMENTOS_REPROVADOS')`,
+    [userId]
+  )
+
+  const { rows: completedProcesses } = await query(
+    `SELECT COUNT(*) as total 
+    FROM app.processes 
+    WHERE user_id = $1 
+    AND status IN ('DOCUMENTOS_APROVADOS', 'DOCUMENTOS_REPROVADOS')`,
+    [userId]
+  )
+
+  const { rows: recentActivities } = await query(
+    `SELECT 
+      p.title as process_title,
+      ph.status,
+      ph.observation,
+      ph.created_at,
+      c.name as client_name
+    FROM app.process_history ph
+    JOIN app.processes p ON p.id = ph.process_id
+    JOIN app.clients c ON c.id = p.client_id
+    WHERE p.user_id = $1
+    ORDER BY ph.created_at DESC
+    LIMIT 5`,
+    [userId]
+  )
+
+  return {
+    totalProcesses: Number(totalProcesses[0].total),
+    totalClients: Number(totalClients[0].total),
+    activeProcesses: Number(activeProcesses[0].total),
+    completedProcesses: Number(completedProcesses[0].total),
+    recentActivities
+  }
+}
+
+const statusMessages = {
+  CADASTRO_REALIZADO: 'Cadastro Realizado',
+  EM_ANALISE_DOCUMENTOS: 'Em Análise de Documentos',
+  DOCUMENTOS_APROVADOS: 'Documentos Aprovados',
+  DOCUMENTOS_REPROVADOS: 'Documentos Reprovados'
+} as const
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
@@ -17,6 +100,8 @@ export default async function DashboardPage() {
   if (!session) {
     redirect('/login')
   }
+
+  const dashboardData = await getDashboardData(session.user.email!)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -36,7 +121,7 @@ export default async function DashboardPage() {
               <div className="flex items-center">
                 <img
                   className="h-8 w-8 rounded-full"
-                  src={session.user.image || `https://ui-avatars.com/api/?name=${session.user.name}`}
+                  src={`https://ui-avatars.com/api/?name=${encodeURIComponent(session.user.name || '')}`}
                   alt={session.user.name || ''}
                 />
                 <span className="ml-3 text-sm font-medium text-gray-700">
@@ -106,7 +191,7 @@ export default async function DashboardPage() {
                       Total de Processos
                     </dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      0
+                      {dashboardData.totalProcesses}
                     </dd>
                   </dl>
                 </div>
@@ -136,7 +221,7 @@ export default async function DashboardPage() {
                       Total de Clientes
                     </dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      0
+                      {dashboardData.totalClients}
                     </dd>
                   </dl>
                 </div>
@@ -166,7 +251,7 @@ export default async function DashboardPage() {
                       Processos Ativos
                     </dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      0
+                      {dashboardData.activeProcesses}
                     </dd>
                   </dl>
                 </div>
@@ -196,7 +281,7 @@ export default async function DashboardPage() {
                       Processos Concluídos
                     </dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      0
+                      {dashboardData.completedProcesses}
                     </dd>
                   </dl>
                 </div>
@@ -220,9 +305,52 @@ export default async function DashboardPage() {
           <h2 className="text-lg font-medium text-gray-900">Atividades Recentes</h2>
           <div className="mt-4 bg-white shadow rounded-lg">
             <div className="p-6">
-              <div className="text-center text-gray-500">
-                Nenhuma atividade recente
-              </div>
+              {dashboardData.recentActivities.length === 0 ? (
+                <div className="text-center text-gray-500">
+                  Nenhuma atividade recente
+                </div>
+              ) : (
+                <div className="flow-root">
+                  <ul role="list" className="-mb-8">
+                    {dashboardData.recentActivities.map((activity, activityIdx) => (
+                      <li key={activity.created_at.toString()}>
+                        <div className="relative pb-8">
+                          {activityIdx !== dashboardData.recentActivities.length - 1 ? (
+                            <span
+                              className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"
+                              aria-hidden="true"
+                            />
+                          ) : null}
+                          <div className="relative flex space-x-3">
+                            <div>
+                              <span className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center ring-8 ring-white">
+                                <FileText className="h-4 w-4 text-white" />
+                              </span>
+                            </div>
+                            <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                              <div>
+                                <p className="text-sm text-gray-500">
+                                  Processo <span className="font-medium text-gray-900">{activity.process_title}</span> do cliente{' '}
+                                  <span className="font-medium text-gray-900">{activity.client_name}</span> teve status alterado para{' '}
+                                  <span className="font-medium text-gray-900">
+                                    {statusMessages[activity.status as keyof typeof statusMessages]}
+                                  </span>
+                                </p>
+                                {activity.observation && (
+                                  <p className="mt-1 text-sm text-gray-500">{activity.observation}</p>
+                                )}
+                              </div>
+                              <div className="whitespace-nowrap text-right text-sm text-gray-500">
+                                {new Date(activity.created_at).toLocaleDateString('pt-BR')}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </div>

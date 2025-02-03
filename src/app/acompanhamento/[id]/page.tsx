@@ -147,30 +147,30 @@ export default function ProcessoDetalhesPage({ params }: { params: { id: string 
 
             {/* Timeline */}
             <div className="flow-root min-h-[100px]">
-              <ul role="list" className="flex justify-between items-center">
+              <ul role="list" className="flex justify-between items-start">
                 {process.history && process.history.length > 0 ? (
                   [...process.history].reverse().map((event, eventIdx) => {
                     const Icon = statusIcons[event.status as keyof typeof statusIcons] || Clock;
                     const colorClass = statusColors[event.status as keyof typeof statusColors] || 'bg-gray-400';
 
                     return (
-                      <li key={event.id} className="flex-1 relative">
-                        <div className="relative flex flex-col items-center">
+                      <li key={event.id} className="flex-1 relative pt-2">
+                        <div className="relative flex flex-col items-center group">
                           {eventIdx !== (process.history?.length || 0) - 1 ? (
                             <span
-                              className="absolute left-full top-4 w-full h-0.5 bg-gray-200"
+                              className="absolute left-1/2 top-6 w-full h-0.5 bg-gray-200 -translate-x-1/2"
                               aria-hidden="true"
                             />
                           ) : null}
-                          <span className={`h-12 w-12 rounded-full flex items-center justify-center ring-4 ring-white ${colorClass}`}>
+                          <span className={`relative z-10 h-12 w-12 rounded-full flex items-center justify-center ring-4 ring-white ${colorClass}`}>
                             <Icon className="h-6 w-6 text-white" aria-hidden="true" />
                           </span>
-                          <div className="mt-2 text-center">
-                            <p className="text-sm text-gray-500">
+                          <div className="mt-3 text-center w-32 mx-auto">
+                            <p className="text-sm text-gray-500 font-medium min-h-[40px] flex items-center justify-center">
                               {statusMessages[event.status as keyof typeof statusMessages]}
                             </p>
                             {event.observation && (
-                              <p className="mt-1 text-xs text-gray-500">
+                              <p className="mt-1 text-xs text-gray-500 truncate max-w-[120px] hover:whitespace-normal hover:text-clip group-hover:max-w-none">
                                 {event.observation}
                               </p>
                             )}
